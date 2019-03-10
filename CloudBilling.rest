@@ -1,0 +1,18 @@
+@identityServiceUrl = https://localhost:44300
+@billingServiceUrl = https://localhost:44301
+@accessToken = 
+
+POST {{identityServiceUrl}}/connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials
+&client_id=client
+&client_secret=secret
+
+###
+
+GET {{billingServiceUrl}}/identity
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+###
