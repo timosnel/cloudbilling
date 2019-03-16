@@ -1,8 +1,14 @@
-﻿using System;
+﻿using CloudBilling.Services.Identity.Data;
+using CloudBilling.Shared.Tracing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenTracing.Contrib.NetCore.CoreFx;
+using System;
 
 namespace CloudBilling.Services.Identity
 {
@@ -19,15 +25,37 @@ namespace CloudBilling.Services.Identity
 
         public void ConfigureServices(IServiceCollection services)
         {
-            // uncomment, if you wan to add an MVC-based UI
-            //services.AddMvc().SetCompatibilityVersion(Microsoft.AspNetCore.Mvc.CompatibilityVersion.Version_2_1);
+            var connectionString = _configuration.GetConnectionString("DefaultConnection");
 
             services.AddHealthChecks();
+
+            services.AddOpenTracing();
+            services.AddCloudBillingJaeger();
+            services.Configure<HttpHandlerDiagnosticOptions>(options =>
+            {
+                options.IgnorePatterns.Add(httpMessage => !httpMessage.RequestUri.IsLoopback);
+            });
+
+            services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(connectionString));
+
+            services.AddIdentity<ApplicationUser, ApplicationRole>()
+                .AddEntityFrameworkStores<ApplicationDbContext>()
+                .AddDefaultTokenProviders();
+
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+
+            services.Configure<IISOptions>(iis =>
+            {
+                iis.AuthenticationDisplayName = "Windows";
+                iis.AutomaticAuthentication = false;
+            });
 
             var builder = services.AddIdentityServer()
                 .AddInMemoryIdentityResources(Config.GetIdentityResources())
                 .AddInMemoryApiResources(Config.GetApis())
-                .AddInMemoryClients(Config.GetClients());
+                .AddInMemoryClients(Config.GetClients())
+                .AddOperationalStore<ApplicationDbContext>(options => options.EnableTokenCleanup = true)
+                .AddAspNetIdentity<ApplicationUser>();
 
             if (_environment.IsDevelopment())
             {
@@ -37,26 +65,30 @@ namespace CloudBilling.Services.Identity
             {
                 throw new Exception("need to configure key material");
             }
+
+            services.AddAuthentication();
         }
 
         public void Configure(IApplicationBuilder app)
         {
             if (_environment.IsDevelopment())
             {
-                app.UseDeveloperExceptionPage();
+                app
+                    .UseDeveloperExceptionPage()
+                    .UseDatabaseErrorPage();
             }
             else
             {
                 app.UseHsts();
+                app.UseExceptionHandler("/Error/Index");
             }
 
             app
                 .UseHealthChecks("/health")
                 .UseHttpsRedirection()
-                .UseIdentityServer();
-
-            // uncomment, if you wan to add an MVC-based UI
-            //app.UseMvcWithDefaultRoute();
+                .UseStaticFiles()
+                .UseIdentityServer()
+                .UseMvcWithDefaultRoute();
         }
     }
 }

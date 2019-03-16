@@ -1,24 +1,30 @@
-﻿using CloudBilling.Shared.Logging;
+﻿using CloudBilling.Services.Identity.Data;
+using CloudBilling.Shared.Logging;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using System;
+using System.Threading.Tasks;
 
 namespace CloudBilling.Services.Identity
 {
-    public class Program
+    public static class Program
     {
-        public static int Main(string[] args)
+        public static async Task<int> Main(string[] args)
         {
             try
             {
-                WebHost.CreateDefaultBuilder(args)
-                    .UseStartup<Startup>()
-                    .ConfigureKestrel(k => k.AddServerHeader = false)
-                    .UseCloudBillingSerilog()
-                    .Build()
-                    .Run();
+                var host = CreateWebHostBuilder(args).Build();
 
+                using (var scope = host.Services.GetRequiredService<IServiceScopeFactory>().CreateScope())
+                {
+                    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    await dbContext.Database.MigrateAsync();
+                }
+
+                host.Run();
                 return 0;
             }
             catch (Exception ex)
@@ -30,6 +36,14 @@ namespace CloudBilling.Services.Identity
             {
                 Log.CloseAndFlush();
             }
+        }
+
+        public static IWebHostBuilder CreateWebHostBuilder(string[] args)
+        {
+            return WebHost.CreateDefaultBuilder(args)
+                .UseStartup<Startup>()
+                .ConfigureKestrel(k => k.AddServerHeader = false)
+                .UseCloudBillingSerilog();
         }
     }
 }

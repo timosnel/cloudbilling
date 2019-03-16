@@ -1,0 +1,29 @@
+﻿@model ErrorViewModel
+
+<div class="error-page">
+    <div class="page-header">
+        <h1>Error</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-sm-6">
+            <div class="alert alert-danger">
+                Sorry, there was an error
+
+                @if (Model.Error != null)
+                {
+                    <strong>
+                        <em>
+                            : @Model.Error
+                        </em>
+                    </strong>
+
+                    if (Model.ErrorDescription != null)
+                    {
+                        <div>@Model.ErrorDescription</div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
